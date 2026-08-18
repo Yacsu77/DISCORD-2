@@ -1,18 +1,20 @@
 name: Release
 
 on:
-  release:
-    types: [published]
   push:
-    tags:
-      - v*
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -42,8 +44,73 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Package and publish
-        run: pnpm electron-builder --${{ matrix.platform }} --publish always
+      - name: Package
+        run: pnpm electron-builder --${{ matrix.platform }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          shopt -s nullglob
+          for f in \
+            dist/*.exe dist/*.msi dist/*.dmg dist/*.pkg dist/*.zip \
+            dist/*.AppImage dist/*.deb dist/*.rpm dist/*.tar.gz \
+            dist/*.pacman dist/*.yml dist/*.blockmap
+          do
+            cp "$f" artifacts/
+          done
+          ls -la artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: artifacts/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'failure') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          NOTES="$(cat <<EOF
+          Build automático da \`main\` (\`${SHORT_SHA}\`).
+
+          Baixe o instalador da sua plataforma:
+          - Windows: \`.exe\` ou \`.zip\`
+          - macOS: \`.dmg\` ou \`.zip\`
+          - Linux: AppImage, \`.deb\`, \`.rpm\` ou \`.tar.gz\`
+          EOF
+          )"
+
+          files=(artifacts/*)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Nenhum instalador para publicar."
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+            gh release edit "$TAG" --title "v${VERSION}" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" "${files[@]}" --title "v${VERSION}" --notes "$NOTES" --latest
+          fi
