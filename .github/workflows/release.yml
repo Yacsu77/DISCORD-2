@@ -49,6 +49,8 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           CSC_IDENTITY: ""
+          CSC_LINK: ""
+          WIN_CSC_LINK: ""
 
       - name: Collect installers
         shell: bash

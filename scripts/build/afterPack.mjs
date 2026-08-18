@@ -19,6 +19,14 @@ export default async function afterPack(context) {
 async function adHocSignMacApp({ appOutDir, electronPlatformName }) {
     if (electronPlatformName !== "darwin") return;
 
+    // Universal builds pack x64 and arm64 into *-temp dirs first, then merge.
+    // Signing those slices writes different _CodeSignature/CodeResources files
+    // and @electron/universal refuses to combine them.
+    if (String(appOutDir).includes("-temp")) {
+        console.log(`Skipping ad-hoc sign for intermediate slice ${appOutDir}`);
+        return;
+    }
+
     const appName = (await readdir(appOutDir)).find(item => item.endsWith(".app"));
     if (!appName) {
         console.warn(`Could not find .app directory in ${appOutDir}. Skipping ad-hoc sign.`);

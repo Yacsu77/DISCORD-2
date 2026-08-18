@@ -85,10 +85,12 @@
         },
         "beforePack": "scripts/build/beforePack.mjs",
         "afterPack": "scripts/build/afterPack.mjs",
+        "forceCodeSigning": false,
         "linux": {
             "icon": "build/icon.svg",
             "category": "Network",
             "maintainer": "vendicated+vesktop@riseup.net",
+            "forceCodeSigning": false,
             "target": [
                 {
                     "target": "deb",
@@ -146,6 +148,7 @@
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
             "notarize": false,
+            "forceCodeSigning": false,
             "entitlements": "build/entitlements.mac.plist",
             "entitlementsInherit": "build/entitlements.mac.plist",
             "extendInfo": {
@@ -183,6 +186,9 @@
         },
         "win": {
             "icon": "build/icon.ico",
+            "signExecutable": false,
+            "verifyUpdateCodeSignature": false,
+            "forceCodeSigning": false,
             "target": [
                 {
                     "target": "nsis",
