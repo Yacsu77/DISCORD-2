@@ -48,6 +48,7 @@ jobs:
         run: pnpm electron-builder --${{ matrix.platform }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_IDENTITY: ""
 
       - name: Collect installers
         shell: bash
